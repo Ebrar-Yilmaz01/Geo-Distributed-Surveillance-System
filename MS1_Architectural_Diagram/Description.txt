@@ -1,1 +1,8 @@
 In this weekly MileStone we will create an architectural Diagram of our Project.
+
+add initial architectural diagram for surveillance system
+
+- Implements 5-2-2 IoT-Edge-Cloud distribution
+- Shows YOLO detection at edge layer  
+- Uses Akka for cloud coordination and face analysis
+- Includes Redis for state management
