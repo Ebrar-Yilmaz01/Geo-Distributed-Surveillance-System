@@ -1,0 +1,139 @@
+
+services:
+ 
+
+  # =========================================================================
+  # REDIS INSTANCES (One per Edge Node)
+  # =========================================================================
+  redis-europe:
+    image: redis:7-alpine
+    container_name: redis-europe
+    command: redis-server --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_europe_data:/data
+    networks:
+      - farm_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  redis-asia:
+    image: redis:7-alpine
+    container_name: redis-asia
+    command: redis-server --appendonly yes
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis_asia_data:/data
+    networks:
+      - farm_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  # =========================================================================
+  # EDGE NODES
+  # =========================================================================
+  edge-europe:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: edge-europe
+    environment:
+      EDGE_NODE_ID: "edge-europe"
+      REDIS_HOST: "redis-europe"
+      REDIS_PORT: "6379"
+      MQTT_BROKER: "mqtt_broker"
+      MQTT_PORT: "1883"
+      LOG_LEVEL: "DEBUG"
+    depends_on:
+      redis-europe:
+        condition: service_healthy
+
+    networks:
+      - farm_network
+    volumes:
+      - ./logs/edge-europe:/app/logs
+      - .:/app/source
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  edge-asia:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: edge-asia
+    environment:
+      EDGE_NODE_ID: "edge-asia"
+      REDIS_HOST: "redis-asia"
+      REDIS_PORT: "6379"
+      MQTT_BROKER: "mqtt_broker"
+      MQTT_PORT: "1883"
+      LOG_LEVEL: "DEBUG"
+    depends_on:
+      redis-asia:
+        condition: service_healthy
+    networks:
+      - farm_network
+    volumes:
+      - ./logs/edge-asia:/app/logs
+      - .:/app/source
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # =========================================================================
+  # MONITORING (Optional: Redis Commander for debugging)
+  # =========================================================================
+  redis-commander-europe:
+    image: rediscommander/redis-commander:latest
+    container_name: redis-commander-europe
+    environment:
+      - REDIS_HOSTS=local:redis-europe:6379
+    ports:
+      - "8081:8081"
+    depends_on:
+      - redis-europe
+    networks:
+      - farm_network
+    restart: unless-stopped
+
+  redis-commander-asia:
+    image: rediscommander/redis-commander:latest
+    container_name: redis-commander-asia
+    environment:
+      - REDIS_HOSTS=local:redis-asia:6379
+    ports:
+      - "8082:8081"
+    depends_on:
+      - redis-asia
+    networks:
+      - farm_network
+    restart: unless-stopped
+
+
+
+networks:
+  farm_network:
+    driver: bridge
+
+volumes:
+  mosquitto_data:
+  mosquitto_logs:
+  redis_europe_data:
+  redis_asia_data:
